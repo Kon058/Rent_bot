@@ -1,5 +1,6 @@
 import sqlite3
 import telebot
+from telebot import types
 import os.path
 import os
 import datetime
@@ -14,11 +15,18 @@ text_start = 'ТЦ Березка\n\nТекущий месяц - {month}\n\nОб
 month = ''
 month_list = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
            'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
+
+stat_menu = {
+    'who_paid': 'Оплаченная аренда',
+    'who_didnt_pay': 'Не оплаченная аренда',
+    'all': 'Полный список'
+}
+
 def check_base():
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS RENTER(
-        renter_id INT PRYMARY KEY,
+        r_id INT PRYMARY KEY,
         name TEXT);
     """)
     cur.execute("""    
@@ -26,12 +34,19 @@ def check_base():
         p_id INT PRYMARY KEY,
         month TEXT,
         stavka INT,
-        payment int);
+        payment int,
+        renter_id INT,
+        FOREIGN KEY (renter_id) REFERENCES RENTER (r_id));
     """)
     conn.commit()
 
 def get_all_rents():
-    pass
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """SELECT name FROM RENTER;"""
+    cur.execute(query)
+    conn.commit()
+    return cur.fetchall()
 
 def get_who_paid():
     pass
@@ -44,15 +59,20 @@ def get_month():
     number_month = int(d.strftime('%m'))
     return month_list[number_month-1]
 
+def mani_menu(data, dict, text):
+    mainmenu = types.InlineKeyboardMarkup()
+    for i in dict:
+        bt = types.InlineKeyboardButton(text=dict[i], callback_data=i)
+        mainmenu.row(bt)
+    bot.send_message(data, text, reply_markup=mainmenu, disable_web_page_preview=True)
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
-
-    bot.send_message(message.chat.id, text_start.format(month=month, all=20, pay=16, not_pay=4))
+    mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
 
 
 check_base()
 month = get_month()
-
 
 bot.polling()
 
