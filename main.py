@@ -21,7 +21,6 @@ stat_menu = {
     'who_didnt_pay': 'Не оплаченная аренда',
     'all': 'Полный список'
 }
-
 who_paid_menu = {
     'cansel': 'Убрать арендную плату',
     'change_month': 'Выбрать другой месяц',
@@ -32,7 +31,7 @@ who_didnt_pay_menu = {
     'change_month': 'Выбрать другой месяц',
     'stat_menu': 'Назад'
 }
-all_list_renter = {
+all_menu = {
     'add_renter': 'Добавить арендатора',
     'del_renter': 'Удалить арендатора',
     'change': 'Изменить данные',
@@ -88,9 +87,9 @@ def start_message(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    global location_in_menu
-    if call.data == 'main':
-        pass
+    if call.data in stat_menu:
+        #print(eval(str(call.data)+'_menu'))
+        mani_menu(call.message.chat.id, eval(str(call.data)+'_menu'), )
 
 
 
