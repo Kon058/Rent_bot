@@ -22,6 +22,22 @@ stat_menu = {
     'all': 'Полный список'
 }
 
+who_paid_menu = {
+    'cansel': 'Убрать арендную плату',
+    'change_month': 'Выбрать другой месяц',
+    'stat_menu': 'Назад'
+}
+who_didnt_pay_menu = {
+    'who_paid': 'Внести арендную плату',
+    'change_month': 'Выбрать другой месяц',
+    'stat_menu': 'Назад'
+}
+all_list_renter = {
+    'add_renter': 'Добавить арендатора',
+    'del_renter': 'Удалить арендатора',
+    'change': 'Изменить данные',
+    'stat_menu': 'Назад'
+}
 def check_base():
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
@@ -69,6 +85,13 @@ def mani_menu(data, dict, text):
 @bot.message_handler(commands=['start'])
 def start_message(message):
     mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+    global location_in_menu
+    if call.data == 'main':
+        pass
+
 
 
 check_base()
