@@ -13,22 +13,23 @@ bot = telebot.TeleBot(token)
 text_start = 'ТЦ Березка\n\nТекущий месяц - {month}\n\nОбщее количество арендаторов - {all}\nКоличество оплативших - ' \
              '{pay}\nКоличество не оплативших - {not_pay}'
 month = ''
-month_list = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
-           'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
-
+month_list = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+           'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+location_menu = ''
+input_name = ''
+input_stavka = 0
 stat_menu = {
     'who_paid': 'Оплаченная аренда',
     'who_didnt_pay': 'Не оплаченная аренда',
+    'change_month': 'Выбрать другой месяц',
     'all': 'Полный список'
 }
 who_paid_menu = {
     'cansel': 'Убрать арендную плату',
-    'change_month': 'Выбрать другой месяц',
     'stat_menu': 'Назад'
 }
 who_didnt_pay_menu = {
     'who_paid': 'Внести арендную плату',
-    'change_month': 'Выбрать другой месяц',
     'stat_menu': 'Назад'
 }
 all_menu = {
@@ -41,33 +42,55 @@ def check_base():
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS RENTER(
-        r_id INT PRYMARY KEY,
-        name TEXT);
+        r_id integer primary key AUTOINCREMENT,
+        name TEXT,
+        stavka INT);
     """)
     cur.execute("""    
         CREATE TABLE IF NOT EXISTS PAYMENTS(
-        p_id INT PRYMARY KEY,
+        p_id integer primary key AUTOINCREMENT,
         month TEXT,
-        stavka INT,
         payment int,
         renter_id INT,
-        FOREIGN KEY (renter_id) REFERENCES RENTER (r_id));
+        FOREIGN KEY (renter_id) REFERENCES RENTER (r_id) ON DELETE CASCADE);
     """)
     conn.commit()
 
 def get_all_rents():
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
-    query = """SELECT name FROM RENTER;"""
+    query = """SELECT * FROM RENTER;"""
     cur.execute(query)
     conn.commit()
     return cur.fetchall()
 
-def get_who_paid():
-    pass
+def get_who_paid(month):
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """SELECT name FROM RENTER;"""
+    cur.execute(query)
+    conn.commit()
 
-def get_who_didnt_pay():
-    pass
+def get_who_didnt_pay(month):
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """SELECT name FROM RENTER;"""
+    cur.execute(query)
+    conn.commit()
+
+def add_rent(name, stavka):
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """INSERT INTO RENTER (name, stavka) VALUES(:name_renter, :stavka_renter);"""
+    cur.execute(query, {'name_renter': name, 'stavka_renter': stavka})
+    conn.commit()
+
+def del_rent(name):
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """DELETE FROM PLACE WHERE name = :name;"""
+    cur.execute(query, {'name' : name})
+    conn.commit()
 
 def get_month():
     d = datetime.datetime.now()
@@ -79,7 +102,13 @@ def mani_menu(data, dict, text):
     for i in dict:
         bt = types.InlineKeyboardButton(text=dict[i], callback_data=i)
         mainmenu.row(bt)
-    bot.send_message(data, text, reply_markup=mainmenu, disable_web_page_preview=True)
+    bot.send_message(data, text, reply_markup=mainmenu)
+def print_full_list(calldata):
+    text_out = 'Полный список арендаторов\n\n'
+    full_list = get_all_rents()
+    for i in full_list:
+        text_out = text_out + i[1] + ' - ' + str(i[2]) + '\n'
+    mani_menu(calldata, all_menu, text_out)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -87,11 +116,50 @@ def start_message(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    if call.data in stat_menu:
+    global month, location_menu
+    if call.data == 'who_paid':
+        text_out = 'Оплатившие аренду'
         #print(eval(str(call.data)+'_menu'))
-        mani_menu(call.message.chat.id, eval(str(call.data)+'_menu'), )
+        mani_menu(call.message.chat.id, who_paid_menu, text_out)
+    elif call.data == 'who_didnt_pay':
+        text_out = 'Не оплатившие аренду'
+        mani_menu(call.message.chat.id, who_didnt_pay_menu, text_out)
+    elif call.data == 'all':
+        print_full_list(call.message.chat.id)
+    elif call.data == 'stat_menu' or call.data in month_list:
+        if call.data in month_list:
+            month = str(call.data)
+        mani_menu(call.message.chat.id, stat_menu,
+                  text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
+    elif call.data == 'change_month':
+        mainmenu = types.InlineKeyboardMarkup()
+        for i in month_list:
+            bt = types.InlineKeyboardButton(text=i, callback_data=i)
+            mainmenu.row(bt)
+        bt_back = types.InlineKeyboardButton(text='Назад', callback_data='stat_menu')
+        mainmenu.row(bt_back)
+        bot.send_message(call.message.chat.id, 'Выберите интересующий месяц', reply_markup=mainmenu)
+    elif call.data == 'add_renter':
+        bot.send_message(call.message.chat.id, 'Введите наименование арендатора')
+        location_menu = 'enter_arendator'
+    elif call.data == 'del_renter':
+        pass
+    elif call.data == 'change':
+        pass
 
-
+@bot.message_handler(content_types=['text'])
+def text_message(message):
+    global input_name, location_menu, input_stavka
+    chat_id = message.chat.id
+    if message.text != '' and location_menu == 'enter_arendator':
+        input_name = message.text
+        bot.send_message(message.chat.id, 'Введите размер арендной ставки')
+        location_menu = 'enter_stavka'
+    elif message.text != '' and location_menu == 'enter_stavka':
+        input_stavka = int(message.text)
+        location_menu = ''
+        add_rent(input_name, input_stavka)
+        print_full_list(message.chat.id)
 
 check_base()
 month = get_month()
