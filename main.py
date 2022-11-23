@@ -18,6 +18,7 @@ month_list = ['Январь', 'Февраль', 'Март', 'Апрель', 'М�
 location_menu = ''
 input_name = ''
 input_stavka = 0
+list_delete = []
 stat_menu = {
     'who_paid': 'Оплаченная аренда',
     'who_didnt_pay': 'Не оплаченная аренда',
@@ -78,6 +79,7 @@ def get_who_didnt_pay(month):
     cur.execute(query)
     conn.commit()
 
+
 def add_rent(name, stavka):
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
@@ -85,11 +87,12 @@ def add_rent(name, stavka):
     cur.execute(query, {'name_renter': name, 'stavka_renter': stavka})
     conn.commit()
 
-def del_rent(name):
+
+def del_rent(id):
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
-    query = """DELETE FROM PLACE WHERE name = :name;"""
-    cur.execute(query, {'name' : name})
+    query = """DELETE FROM RENTER WHERE r_id = :id;"""
+    cur.execute(query, {'id' : id})
     conn.commit()
 
 def get_month():
@@ -116,7 +119,7 @@ def start_message(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    global month, location_menu
+    global month, location_menu, list_delete
     if call.data == 'who_paid':
         text_out = 'Оплатившие аренду'
         #print(eval(str(call.data)+'_menu'))
@@ -124,7 +127,9 @@ def callback_inline(call):
     elif call.data == 'who_didnt_pay':
         text_out = 'Не оплатившие аренду'
         mani_menu(call.message.chat.id, who_didnt_pay_menu, text_out)
-    elif call.data == 'all':
+    elif call.data == 'all' or 'delete' in call.data:
+        if 'delete' in call.data:
+            del_rent(str(call.data)[7:])
         print_full_list(call.message.chat.id)
     elif call.data == 'stat_menu' or call.data in month_list:
         if call.data in month_list:
@@ -143,14 +148,22 @@ def callback_inline(call):
         bot.send_message(call.message.chat.id, 'Введите наименование арендатора')
         location_menu = 'enter_arendator'
     elif call.data == 'del_renter':
-        pass
+        list_delete = get_all_rents()
+        mainmenu = types.InlineKeyboardMarkup()
+        for i in list_delete:
+            bt = types.InlineKeyboardButton(text=i[1], callback_data='delete_'+str(i[0]))
+            mainmenu.row(bt)
+        bt_back = types.InlineKeyboardButton(text='Назад', callback_data='all')
+        mainmenu.row(bt_back)
+        bot.send_message(call.message.chat.id, 'Выберите арендатора для удаления', reply_markup=mainmenu)
     elif call.data == 'change':
         pass
+
+
 
 @bot.message_handler(content_types=['text'])
 def text_message(message):
     global input_name, location_menu, input_stavka
-    chat_id = message.chat.id
     if message.text != '' and location_menu == 'enter_arendator':
         input_name = message.text
         bot.send_message(message.chat.id, 'Введите размер арендной ставки')
