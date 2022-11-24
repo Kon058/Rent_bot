@@ -68,9 +68,10 @@ def get_all_rents():
 def get_who_paid(month):
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
-    query = """SELECT name FROM RENTER;"""
-    cur.execute(query)
+    query = """SELECT * FROM PAYMENTS INNER JOIN RENTER ON (PAYMENTS.'renter_id'=RENTER.'r_id') WHERE month = :month;"""
+    cur.execute(query, {'month': month})
     conn.commit()
+    return cur.fetchall()
 
 def get_who_didnt_pay(month):
     conn = sqlite3.connect('base.db')
@@ -116,14 +117,13 @@ def print_full_list(calldata):
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
+    mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=4))
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     global month, location_menu, list_delete
     if call.data == 'who_paid':
         text_out = 'Оплатившие аренду'
-        #print(eval(str(call.data)+'_menu'))
         mani_menu(call.message.chat.id, who_paid_menu, text_out)
     elif call.data == 'who_didnt_pay':
         text_out = 'Не оплатившие аренду'
@@ -136,7 +136,7 @@ def callback_inline(call):
         if call.data in month_list:
             month = str(call.data)
         mani_menu(call.message.chat.id, stat_menu,
-                  text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
+                  text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=4))
     elif call.data == 'change_month':
         mainmenu = types.InlineKeyboardMarkup()
         for i in month_list:
