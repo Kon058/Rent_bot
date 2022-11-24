@@ -113,6 +113,7 @@ def print_full_list(calldata):
         text_out = text_out + i[1] + ' - ' + str(i[2]) + '\n'
     mani_menu(calldata, all_menu, text_out)
 
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
     mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=16, not_pay=4))
@@ -148,13 +149,19 @@ def callback_inline(call):
         bot.send_message(call.message.chat.id, 'Введите наименование арендатора')
         location_menu = 'enter_arendator'
     elif call.data == 'del_renter':
+        k = []
         list_delete = get_all_rents()
+        text_out = 'Полный список арендаторов\n\n'
         mainmenu = types.InlineKeyboardMarkup()
-        for i in list_delete:
-            bt = types.InlineKeyboardButton(text=i[1], callback_data='delete_'+str(i[0]))
-            mainmenu.row(bt)
+        for count, i in enumerate(list_delete):
+            text_out = text_out + str(count) + '. ' + i[1] + '\n'
+            k.append(types.InlineKeyboardButton(text=str(count), callback_data='delete_'+str(i[0])))
+            if len(k) == 5 or count == (len(list_delete)-1):
+                mainmenu.row(*k)
+                k.clear()
         bt_back = types.InlineKeyboardButton(text='Назад', callback_data='all')
         mainmenu.row(bt_back)
+        bot.send_message(call.message.chat.id, text_out)
         bot.send_message(call.message.chat.id, 'Выберите арендатора для удаления', reply_markup=mainmenu)
     elif call.data == 'change':
         pass
