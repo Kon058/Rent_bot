@@ -31,7 +31,7 @@ who_paid_menu = {
     'stat_menu': 'Назад'
 }
 who_didnt_pay_menu = {
-    'who_paid': 'Внести арендную плату',
+    'set_who_paid': 'Внести арендную плату',
     'stat_menu': 'Назад'
 }
 all_menu = {
@@ -126,10 +126,35 @@ def change_month(calldata, text_out):
     mainmenu.row(bt_back)
     bot.send_message(calldata, text_out, reply_markup=mainmenu)
 
+def full_list_renter(calldata, text_for_out, options, back, stavka=None):
+    k = []
+    list_delete = get_all_rents()
+    text_out = 'Полный список арендаторов\n\n'
+    mainmenu = types.InlineKeyboardMarkup()
+    for count, i in enumerate(list_delete):
+        if stavka:
+            text_out = text_out + str(count) + '. ' + i[1] + ' - ' + str(i[2]) + '\n'
+        else:
+            text_out = text_out + str(count) + '. ' + i[1] + '\n'
+        k.append(types.InlineKeyboardButton(text=str(count), callback_data=options + str(i[0])))
+        if len(k) == 5 or count == (len(list_delete) - 1):
+            mainmenu.row(*k)
+            k.clear()
+    bt_back = types.InlineKeyboardButton(text='Назад', callback_data=back)
+    mainmenu.row(bt_back)
+    bot.send_message(calldata, text_out)
+    bot.send_message(calldata, text_for_out, reply_markup=mainmenu)
+
+def add_contribute(id, pay):
+    conn = sqlite3.connect('base.db')
+    cur = conn.cursor()
+    query = """INSERT INTO PAYMENTS (month, payment, renter_id) VALUES(:month, :pay, :id);"""
+    cur.execute(query, {'month': month, 'pay': pay, 'id': id})
+    conn.commit()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=4))
+    mani_menu(message.chat.id, stat_menu, text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=99))
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -148,33 +173,32 @@ def callback_inline(call):
         if call.data in month_list:
             month = str(call.data)
         mani_menu(call.message.chat.id, stat_menu,
-                  text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=4))
+                  text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=99))
     elif call.data == 'change_month':
         change_month(call.message.chat.id, 'Выберите интересующий месяц')
     elif call.data == 'add_renter':
         bot.send_message(call.message.chat.id, 'Введите наименование арендатора')
         location_menu = 'enter_arendator'
     elif call.data == 'del_renter':
-        k = []
-        list_delete = get_all_rents()
-        text_out = 'Полный список арендаторов\n\n'
-        mainmenu = types.InlineKeyboardMarkup()
-        for count, i in enumerate(list_delete):
-            text_out = text_out + str(count) + '. ' + i[1] + '\n'
-            k.append(types.InlineKeyboardButton(text=str(count), callback_data='delete_'+str(i[0])))
-            if len(k) == 5 or count == (len(list_delete)-1):
-                mainmenu.row(*k)
-                k.clear()
-        bt_back = types.InlineKeyboardButton(text='Назад', callback_data='all')
-        mainmenu.row(bt_back)
-        bot.send_message(call.message.chat.id, text_out)
-        bot.send_message(call.message.chat.id, 'Выберите арендатора для удаления', reply_markup=mainmenu)
+        full_list_renter(call.message.chat.id, 'Выберите арендатора для удаления', 'delete_', 'all')
     elif call.data == 'change':
         pass
     elif ((call.data in month_list) and location_menu == 'enter_month'):
         add_rent(input_name, input_stavka, month_start)
         print_full_list(call.message.chat.id)
         location_menu = ''
+    elif call.data == 'set_who_paid':
+        full_list_renter(call.message.chat.id, 'Выберите арендатора для внесения арендной платы',
+                         'contribute_', 'who_didnt_pay', True)
+    elif call.data == 'cansel':
+        full_list_renter(call.message.chat.id, 'Выберите арендатора для удаления арендной платы',
+                         'cansel_', 'who_paid')
+    elif 'contribute_' in call.data:
+        location_menu = str(call.data)
+        bot.send_message(call.message.chat.id, 'Введите размер платежа')
+        print(location_menu[11:])
+    elif 'cansel_' in call.data:
+        pass
 
 
 @bot.message_handler(content_types=['text'])
@@ -188,7 +212,12 @@ def text_message(message):
         input_stavka = int(message.text)
         location_menu = 'enter_month'
         change_month(message.chat.id, 'Выберите месяц начала аренды')
-
+    elif message.text != '' and 'contribute_' in location_menu:
+        input_stavka = int(message.text)
+        add_contribute(int(location_menu[11:]), input_stavka)
+        location_menu = ''
+        text_out = 'Не оплатившие аренду'
+        mani_menu(message.chat.id, who_didnt_pay_menu, text_out)
 
 
 check_base()
