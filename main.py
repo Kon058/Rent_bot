@@ -19,6 +19,7 @@ location_menu = ''
 input_name = ''
 input_stavka = 0
 list_delete = []
+month_start = ''
 stat_menu = {
     'who_paid': 'Оплаченная аренда',
     'who_didnt_pay': 'Не оплаченная аренда',
@@ -45,7 +46,8 @@ def check_base():
     cur.execute("""CREATE TABLE IF NOT EXISTS RENTER(
         r_id integer primary key AUTOINCREMENT,
         name TEXT,
-        stavka INT);
+        stavka INT,
+        month_start text);
     """)
     cur.execute("""    
         CREATE TABLE IF NOT EXISTS PAYMENTS(
@@ -76,16 +78,17 @@ def get_who_paid(month):
 def get_who_didnt_pay(month):
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
-    query = """SELECT name FROM RENTER;"""
-    cur.execute(query)
+    query = """SELECT * FROM PAYMENTS INNER JOIN RENTER ON (PAYMENTS.'renter_id'=RENTER.'r_id') WHERE month != :month;"""
+    cur.execute(query, {'month': month})
     conn.commit()
+    return cur.fetchall()
 
 
-def add_rent(name, stavka):
+def add_rent(name, stavka, month_start):
     conn = sqlite3.connect('base.db')
     cur = conn.cursor()
-    query = """INSERT INTO RENTER (name, stavka) VALUES(:name_renter, :stavka_renter);"""
-    cur.execute(query, {'name_renter': name, 'stavka_renter': stavka})
+    query = """INSERT INTO RENTER (name, stavka, month_start) VALUES(:name_renter, :stavka_renter, :month_start);"""
+    cur.execute(query, {'name_renter': name, 'stavka_renter': stavka, 'month_start': month_start})
     conn.commit()
 
 
@@ -114,6 +117,15 @@ def print_full_list(calldata):
         text_out = text_out + i[1] + ' - ' + str(i[2]) + '\n'
     mani_menu(calldata, all_menu, text_out)
 
+def change_month(calldata, text_out):
+    mainmenu = types.InlineKeyboardMarkup()
+    for i in month_list:
+        bt = types.InlineKeyboardButton(text=i, callback_data=i)
+        mainmenu.row(bt)
+    bt_back = types.InlineKeyboardButton(text='Назад', callback_data='stat_menu')
+    mainmenu.row(bt_back)
+    bot.send_message(calldata, text_out, reply_markup=mainmenu)
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -132,19 +144,13 @@ def callback_inline(call):
         if 'delete' in call.data:
             del_rent(str(call.data)[7:])
         print_full_list(call.message.chat.id)
-    elif call.data == 'stat_menu' or call.data in month_list:
+    elif call.data == 'stat_menu' or ((call.data in month_list) and location_menu == ''):
         if call.data in month_list:
             month = str(call.data)
         mani_menu(call.message.chat.id, stat_menu,
                   text_start.format(month=month, all=len(get_all_rents()), pay=len(get_who_paid(month)), not_pay=4))
     elif call.data == 'change_month':
-        mainmenu = types.InlineKeyboardMarkup()
-        for i in month_list:
-            bt = types.InlineKeyboardButton(text=i, callback_data=i)
-            mainmenu.row(bt)
-        bt_back = types.InlineKeyboardButton(text='Назад', callback_data='stat_menu')
-        mainmenu.row(bt_back)
-        bot.send_message(call.message.chat.id, 'Выберите интересующий месяц', reply_markup=mainmenu)
+        change_month(call.message.chat.id, 'Выберите интересующий месяц')
     elif call.data == 'add_renter':
         bot.send_message(call.message.chat.id, 'Введите наименование арендатора')
         location_menu = 'enter_arendator'
@@ -165,21 +171,25 @@ def callback_inline(call):
         bot.send_message(call.message.chat.id, 'Выберите арендатора для удаления', reply_markup=mainmenu)
     elif call.data == 'change':
         pass
-
+    elif ((call.data in month_list) and location_menu == 'enter_month'):
+        add_rent(input_name, input_stavka, month_start)
+        print_full_list(call.message.chat.id)
+        location_menu = ''
 
 
 @bot.message_handler(content_types=['text'])
 def text_message(message):
-    global input_name, location_menu, input_stavka
+    global input_name, location_menu, input_stavka, month_start
     if message.text != '' and location_menu == 'enter_arendator':
         input_name = message.text
         bot.send_message(message.chat.id, 'Введите размер арендной ставки')
         location_menu = 'enter_stavka'
     elif message.text != '' and location_menu == 'enter_stavka':
         input_stavka = int(message.text)
-        location_menu = ''
-        add_rent(input_name, input_stavka)
-        print_full_list(message.chat.id)
+        location_menu = 'enter_month'
+        change_month(message.chat.id, 'Выберите месяц начала аренды')
+
+
 
 check_base()
 month = get_month()
